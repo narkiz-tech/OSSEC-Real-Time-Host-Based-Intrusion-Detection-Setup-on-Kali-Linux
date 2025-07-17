@@ -1,0 +1,166 @@
+
+# OSSEC Real-Time Monitoring on Kali Linux
+
+> **Author**: Narkis Abdibekova
+> **Date**: July 2025
+> **License**: MIT
+
+---
+
+## Project Summary
+
+This project demonstrates the installation, configuration, and testing of **OSSEC** (Open Source HIDS SECurity) on **Kali Linux**. It focuses on **real-time monitoring** of system logs, configuration of alert rules, and basic active response. The system is tested to detect suspicious login attempts, such as brute-force SSH attacks.
+
+---
+
+## Objectives
+
+* Install OSSEC on a Kali Linux virtual machine.
+* Configure OSSEC to monitor important log files (like `/var/log/auth.log`).
+* Simulate suspicious activities to test alert generation.
+* Demonstrate potential for active response (e.g. auto-block attackers).
+* Document the entire process in terminal format.
+
+---
+
+## Environment
+
+* OS: **Kali Linux (VirtualBox)**
+* Hostname: `kali`
+* User: `narkis`
+* Tool: **OSSEC (Wazuh fork not used in this case)**
+
+---
+
+## Installation Steps
+
+```bash
+(narkis㉿kali)-[~] 
+└─$ sudo apt update && sudo apt install curl build-essential -y
+
+(narkis㉿kali)-[~] 
+└─$ curl -O https://bintray.com/ossec/ossec-hids/download_file?file_path=ossec-hids-3.6.0.tar.gz
+
+(narkis㉿kali)-[~] 
+└─$ tar -xvzf ossec-hids-3.6.0.tar.gz
+
+(narkis㉿kali)-[~] 
+└─$ cd ossec-hids-3.6.0
+
+(narkis㉿kali)-[~/ossec-hids-3.6.0] 
+└─$ sudo ./install.sh
+```
+
+### 🔧 Installation Options Selected:
+
+* **Language**: English
+* **Install type**: Local installation
+* **Enable email alerts**: No
+* **Enable active response**: Yes
+* **Enable system integrity checking**: Yes
+* **Enable rootkit detection**: Yes
+
+---
+
+## Configuration Changes
+
+I edited OSSEC configuration to monitor the `auth.log` file (which records SSH login attempts):
+
+```xml
+<!-- In /var/ossec/etc/ossec.conf -->
+<localfile>
+  <location>/var/log/auth.log</location>
+  <log_format>syslog</log_format>
+</localfile>
+```
+
+I also ensured the `sshd_rules.xml` file was included:
+
+```xml
+<rules>
+  <include>sshd_rules.xml</include>
+  <!-- more rules... -->
+</rules>
+```
+
+---
+
+## Starting OSSEC
+
+(narkis㉿kali)-[~] 
+└─$ sudo /var/ossec/bin/ossec-control start
+
+Check status:
+(narkis㉿kali)-[~] 
+└─$ sudo /var/ossec/bin/ossec-control status
+
+Output:
+[sudo] password for narkis: 
+ossec-monitord is running...
+ossec-logcollector is running...
+ossec-remoted is running...
+ossec-syscheckd is running...
+ossec-analysisd is running...
+ossec-execd is running...
+
+
+## Alert Testing
+
+I simulated an SSH brute-force attack:
+
+```
+(narkis㉿kali)-[~] 
+└─$ for i in {1..10}; do ssh invaliduser@localhost; done
+```
+
+This should produce a Level 10 alert like:
+
+** Alert 1625593374.23215: mail - syslog,sshd,
+2025 Jul 17 19:22:54 (kali) 192.168.56.101->/var/log/auth.log
+Rule: 5710 (level 10) -> 'SSHD brute force trying to get access to the system.'
+Src IP: 127.0.0.1
+User: invaliduser
+```
+
+To view alerts:
+
+```
+(narkis㉿kali)-[~] 
+└─$ sudo tail -n 50 /var/ossec/logs/alerts/alerts.log
+```
+
+To grep for SSH-related alerts:
+
+```
+(narkis㉿kali)-[~] 
+└─$ sudo grep "sshd" /var/ossec/logs/alerts/alerts.log
+```
+
+---
+
+## ⚡ Active Response 
+
+Although we didn’t fully test IP blocking, OSSEC supports automatic blocking with:
+
+```xml
+<active-response>
+  <command>host-deny</command>
+  <location>local</location>
+  <level>10</level>
+  <timeout>600</timeout>
+</active-response>
+```
+
+Test this by:
+
+* SSHing multiple times with wrong passwords.
+* Checking `/etc/hosts.deny` or using `iptables -L`.
+
+
+## 🔍 Key Learnings
+
+* OSSEC is a powerful tool for real-time log analysis and intrusion detection.
+* Even basic brute-force attempts can be flagged and logged with the right config.
+* Using open-source HIDS helps students and sysadmins learn defensive security in practice.
+
+
